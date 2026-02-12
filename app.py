@@ -21,30 +21,61 @@ st.set_page_config(
 # ============================================================================
 @st.cache_resource
 def load_models():
+    """Load models directly from ZIP file without extraction"""
     try:
-        # Extract models from ZIP
-        with zipfile.ZipFile('models.zip', 'r') as zip_ref:
-            zip_ref.extractall('temp_models/')
-
-        # Load all models
-        yield_model = joblib.load('temp_models/yield_model.pkl')
-        crop_model = joblib.load('temp_models/crop_model.pkl')
-        le_crop = joblib.load('temp_models/label_encoder_crop.pkl')
-        le_season = joblib.load('temp_models/label_encoder_season.pkl')
-        le_district = joblib.load('temp_models/label_encoder_district.pkl')
+        if not os.path.exists('models.zip'):
+            st.error("**models.zip** file not found!")
+            st.info("Please place **models.zip** in the same folder as this app")
+            st.stop()
         
-        return {
-            'yield': yield_model,
-            'crop': crop_model,
-            'crop_encoder': le_crop,
-            'season_encoder': le_season,
-            'district_encoder': le_district
-        }
+        models = {}
+        
+        # Load each model directly from ZIP using ZipFile.open()
+        with zipfile.ZipFile('models.zip', 'r') as zip_ref:
+            # List all files in zip to debug
+            file_list = zip_ref.namelist()
+            st.info(f"Found files in models.zip: {len(file_list)}")
+            
+            # Load required models
+            required_files = [
+                'yield_model.pkl',
+                'crop_model.pkl', 
+                'label_encoder_crop.pkl',
+                'label_encoder_season.pkl',
+                'label_encoder_district.pkl'
+            ]
+            
+            for filename in required_files:
+                if filename in file_list:
+                    with zip_ref.open(filename) as f:
+                        # Load from BytesIO for joblib
+                        import io
+                        model_data = io.BytesIO(f.read())
+                        if 'yield_model' in filename:
+                            models['yield'] = joblib.load(model_data)
+                        elif 'crop_model' in filename:
+                            models['crop'] = joblib.load(model_data)
+                        elif 'label_encoder_crop' in filename:
+                            models['crop_encoder'] = joblib.load(model_data)
+                        elif 'label_encoder_season' in filename:
+                            models['season_encoder'] = joblib.load(model_data)
+                        elif 'label_encoder_district' in filename:
+                            models['district_encoder'] = joblib.load(model_data)
+                else:
+                    st.warning(f"Missing {filename} in models.zip")
+            
+            if len(models) == 5:
+                st.success("All models loaded successfully!")
+                return models
+            else:
+                st.error("Missing required model files in models.zip")
+                st.info(f"Expected 5 files, loaded {len(models)}")
+                return None
+                
     except Exception as e:
-        st.error(f"Error loading models/encoders: {e}")
-        st.error("Make sure 'models.zip' is uploaded to your repo root")
+        st.error(f"Error loading models: {str(e)}")
+        st.error("Check that models.zip contains the 5 required .pkl files")
         return None
-
 models = load_models()
 if models is None:
     st.stop()
@@ -381,4 +412,5 @@ if st.button("🔮 Predict Recommended Crop & Yield", use_container_width=True):
         st.dataframe(summary_df, hide_index=True, use_container_width=True)
 
     except Exception as e:
+
         st.error(f"Error during prediction: {e}")
