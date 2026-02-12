@@ -4,7 +4,8 @@ import numpy as np
 import joblib
 import requests
 import zipfile
-import io
+import os
+import tempfile
 
 # ============================================================================
 # PAGE CONFIG
@@ -414,3 +415,4 @@ if st.button("🔮 Predict Recommended Crop & Yield", use_container_width=True):
     except Exception as e:
 
         st.error(f"Error during prediction: {e}")
+
