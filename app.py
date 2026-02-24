@@ -22,9 +22,6 @@ st.set_page_config(
 # LOAD MODELS & ENCODERS
 # ============================================================================
 @st.cache_resource
-import os  # ← ADD THIS at the top with other imports
-
-@st.cache_resource
 def load_models():
     try:
         st.info("🔄 Loading models from models.zip...")
@@ -426,6 +423,7 @@ if st.button("🔮 Predict Recommended Crop & Yield", use_container_width=True):
     except Exception as e:
 
         st.error(f"Error during prediction: {e}")
+
 
 
 
