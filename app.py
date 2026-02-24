@@ -22,75 +22,68 @@ st.set_page_config(
 # LOAD MODELS & ENCODERS
 # ============================================================================
 @st.cache_resource
+import os  # ← ADD THIS at the top with other imports
+
+@st.cache_resource
 def load_models():
-    """Load models directly from models.zip/models/ folder without extraction"""
     try:
+        st.info("🔄 Loading models from models.zip...")
+
         if not os.path.exists('models.zip'):
-            st.error("models.zip file not found!")
-            st.info("Please place models.zip in the same folder as this app")
-            st.stop()
-        
-        models = {}
-        
-        # Load each model directly from ZIP using ZipFile.open()
+            st.error("❌ models.zip not found in repo root!")
+            return None
+
+        # Extract
         with zipfile.ZipFile('models.zip', 'r') as zip_ref:
-            # List all files in zip to debug
-            file_list = zip_ref.namelist()
-            st.info(f"Found files in models.zip: {len(file_list)}")
-            st.info(f"Zip contents: {file_list[:5]}{'...' if len(file_list)>5 else ''}")
-            
-            # Load required models from models/ folder
-            required_files = [
-                'models/yield_model.pkl',
-                'models/crop_model.pkl', 
-                'models/label_encoder_crop.pkl',
-                'models/label_encoder_season.pkl',
-                'models/label_encoder_soil.pkl',  # Updated to soil (from your notebook)
-                'models/yield_features.pkl',
-                'models/crop_features.pkl'
-            ]
-            
-            for filename in required_files:
-                if filename in file_list:
-                    with zip_ref.open(filename) as f:
-                        # Load from BytesIO for joblib
-                        model_data = io.BytesIO(f.read())
-                        if 'yield_model' in filename:
-                            models['yield'] = joblib.load(model_data)
-                            st.info(f"Loaded yield_model")
-                        elif 'crop_model' in filename:
-                            models['crop'] = joblib.load(model_data)
-                            st.info(f"Loaded crop_model")
-                        elif 'label_encoder_crop' in filename:
-                            models['crop_encoder'] = joblib.load(model_data)
-                            st.info(f"Loaded crop_encoder")
-                        elif 'label_encoder_season' in filename:
-                            models['season_encoder'] = joblib.load(model_data)
-                            st.info(f"Loaded season_encoder")
-                        elif 'label_encoder_soil' in filename:
-                            models['soil_encoder'] = joblib.load(model_data)
-                            st.info(f"Loaded soil_encoder")
-                        elif 'yield_features' in filename:
-                            models['yield_features'] = joblib.load(model_data)
-                            st.info(f"Loaded yield_features")
-                        elif 'crop_features' in filename:
-                            models['crop_features'] = joblib.load(model_data)
-                            st.info(f"Loaded crop_features")
-                else:
-                    st.warning(f"Missing {filename} in models.zip")
-            
-            if len(models) >= 5:  # At least core models + encoders
-                st.success(f"All models loaded successfully! Loaded {len(models)} files")
-                return models
-            else:
-                st.error("Missing required model files in models.zip")
-                st.info(f"Expected files in models/ folder, loaded {len(models)}")
-                st.info("Make sure your models.zip contains: models/yield_model.pkl, models/crop_model.pkl, etc.")
-                return None
-                
+            zip_ref.extractall('temp_models/')
+
+        # === DEBUG: Show exactly what was extracted ===
+        st.write("📁 Extracted files:")
+        extracted = []
+        for root, dirs, files in os.walk('temp_models'):
+            for f in files:
+                if f.endswith('.pkl'):
+                    full = os.path.join(root, f)
+                    extracted.append(full)
+                    st.write(f"   • {full}")
+        
+        # Handle common subfolder case automatically
+        base = 'temp_models/'
+        if os.path.exists('temp_models/models/'):
+            base = 'temp_models/models/'
+
+        # Load with flexible paths
+        yield_model = joblib.load(os.path.join(base, 'yield_model.pkl'))
+        crop_model = joblib.load(os.path.join(base, 'crop_model.pkl'))
+        le_crop = joblib.load(os.path.join(base, 'label_encoder_crop.pkl'))
+        le_season = joblib.load(os.path.join(base, 'label_encoder_season.pkl'))
+        le_district = joblib.load(os.path.join(base, 'label_encoder_district.pkl'))
+
+        st.success("✅ All 5 models/encoders loaded successfully!")
+
+        return {
+            'yield': yield_model,
+            'crop': crop_model,
+            'crop_encoder': le_crop,
+            'season_encoder': le_season,
+            'district_encoder': le_district
+        }
+
+    except FileNotFoundError as e:
+        st.error(f"❌ Missing file: {e}")
+        st.error("Make sure these **exact** files are at the ROOT of models.zip (no folders):")
+        st.code("\n".join([
+            "yield_model.pkl",
+            "crop_model.pkl",
+            "label_encoder_crop.pkl",
+            "label_encoder_season.pkl",
+            "label_encoder_district.pkl"
+        ]))
+        return None
     except Exception as e:
-        st.error(f"Error loading models: {str(e)}")
-        st.error("Check that models.zip contains models/ folder with all .pkl files")
+        st.error(f"❌ Load error: {e}")
+        import traceback
+        st.code(traceback.format_exc())
         return None
 
 # Load models at startup
@@ -433,5 +426,6 @@ if st.button("🔮 Predict Recommended Crop & Yield", use_container_width=True):
     except Exception as e:
 
         st.error(f"Error during prediction: {e}")
+
 
 
